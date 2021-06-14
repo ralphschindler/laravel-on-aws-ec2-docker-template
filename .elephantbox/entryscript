@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+env >> /etc/environment
+
+printf "* * * * * root cd /app && php artisan schedule:run >> /dev/null 2>&1\n" > /etc/cron.d/artisan-scheduler
+
+sed -i '/<policy domain="coder" rights="none" pattern="PDF" \/>/c\  <policy domain="coder" rights="read | write" pattern="PDF" \/>' /etc/ImageMagick-6/policy.xml

@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  traefik:
+    image: traefik:2.4
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./acme.json:/acme.json
+    ports:
+      - 443:443
+      - 80:80
+      - 8080:8080
+    command: >-
+      --api.insecure=true
+      --entrypoints.http.address=:80
+      --entrypoints.https.address=:443
+      --providers.docker.exposedbydefault=false
+      --certificatesresolvers.default.acme.email=email@project-domain.tld
+      --certificatesresolvers.default.acme.storage=acme.json
+      --certificatesresolvers.default.acme.tlschallenge=true
+    depends_on:
+      - web
+
+  web:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.web.rule=Host(`project-domain.tld`)||Host(`www.project-domain.tld`)
+      - traefik.http.routers.web.entrypoints=https
+      - traefik.http.routers.web.tls=true
+      - traefik.http.routers.web.tls.certresolver=default
+      - traefik.http.routers.web.tls.domains[0].main=project-domain.tld
+      - traefik.http.routers.web.tls.domains[1].main=www.project-domain.tld
+      - traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)
+      - traefik.http.routers.http-catchall.entrypoints=http
+      - traefik.http.routers.http-catchall.middlewares=redirect-to-https@docker
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+    build: .
+    command: run-services nginx,php-fpm,cron
+    environment:
+      APP_NAME: project-name
+      APP_ENV: production
+    volumes:
+      - .:/app
+      - /home/ubuntu/composer-auth.json:/root/.composer/auth.json
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:latest

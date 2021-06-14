@@ -1,0 +1,36 @@
+name: Push To Master Deploy
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy-to-server:
+    name: Deploy To Server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Add public IP to AWS security group
+        uses: sohelamin/aws-security-group-add-ip-action@master
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: 'us-east-1'
+          aws-security-group-id: ${{ secrets.AWS_SECURITY_GROUP_ID }}
+          port: '22'
+          to-port: '30'
+          protocol: 'tcp'
+          description: 'GitHub Action'
+      - name: Run SSH Deployment Script
+        uses: appleboy/ssh-action@master
+        with:
+          host: project-website.tld
+          username: ubuntu
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd project-website.tld
+            git fetch origin
+            git rebase origin master
+            docker-compose -f docker-compose.production.yml exec -T web composer -q install --ignore-platform-reqs
+            docker-compose -f docker-compose.production.yml exec -T web composer -q run restart-php
